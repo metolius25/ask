@@ -74,7 +74,7 @@ default_provider: gemini
 providers:
   gemini:
     api_key: YOUR_ACTUAL_API_KEY_HERE
-    # model: gemini-1.5-pro  # Optional: override default model
+    # model: gemini-2.5-pro  # Optional: override default model
 ```
 
 **Note:** The `model` field is optional. If not specified, the app will use the default model for each provider:
