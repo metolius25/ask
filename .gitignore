@@ -1,0 +1,20 @@
+# Binary
+ask
+
+# Config files with API keys
+config.yaml
+defaults.yaml
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+ask
+
+# Test binary, built with `go test -c`
+*.test
+
+# Go coverage files
+*.out

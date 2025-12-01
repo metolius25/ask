@@ -1,0 +1,21 @@
+# Default provider to use (gemini, claude, chatgpt, or deepseek)
+default_provider: gemini
+
+# Provider configurations
+# Only configure the providers you want to use
+providers:
+  gemini:
+    api_key: YOUR_GEMINI_API_KEY_HERE
+    # model: gemini-1.5-pro  # Optional: override default model
+  
+  claude:
+    api_key: YOUR_CLAUDE_API_KEY_HERE
+    # model: claude-3-opus-20240229  # Optional: override default model
+  
+  chatgpt:
+    api_key: YOUR_OPENAI_API_KEY_HERE
+    # model: gpt-4-turbo  # Optional: override default model
+  
+  deepseek:
+    api_key: YOUR_DEEPSEEK_API_KEY_HERE
+    # model: deepseek-reasoner  # Optional: override default model
