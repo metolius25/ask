@@ -173,16 +173,16 @@ func renderMarkdown(content string) error {
 }
 
 func printFirstRunHelp() {
-	fmt.Println("👋 Welcome to Ask - AI CLI Client!")
+	fmt.Println("Welcome to Ask - AI CLI Client!")
 	fmt.Println()
 	fmt.Println("It looks like this is your first time running the app.")
 	fmt.Println("Let's get you set up in 4 easy steps:")
 	fmt.Println()
-	fmt.Println("📝 Step 1: Create a config file")
+	fmt.Println("   Step 1: Create a config file")
 	fmt.Println("   Copy the example config:")
 	fmt.Println("   $ cp config.yaml.example config.yaml")
 	fmt.Println()
-	fmt.Println("🤖 Step 2: Choose your AI provider")
+	fmt.Println("   Step 2: Choose your AI provider")
 	fmt.Println("   Pick one (or configure multiple):")
 	fmt.Println()
 	fmt.Println("   • Gemini   - Google's latest models (fast, free tier available)")
@@ -190,14 +190,14 @@ func printFirstRunHelp() {
 	fmt.Println("   • ChatGPT  - OpenAI's models (including o1)")
 	fmt.Println("   • DeepSeek - Cost-effective option")
 	fmt.Println()
-	fmt.Println("🔑 Step 3: Get an API key for your chosen provider")
+	fmt.Println("   Step 3: Get an API key for your chosen provider")
 	fmt.Println()
 	fmt.Println("   • Gemini  : https://makersuite.google.com/app/apikey")
 	fmt.Println("   • Claude  : https://console.anthropic.com/")
 	fmt.Println("   • ChatGPT : https://platform.openai.com/api-keys")
 	fmt.Println("   • DeepSeek: https://platform.deepseek.com/")
 	fmt.Println()
-	fmt.Println("✏️  Step 4: Configure config.yaml")
+	fmt.Println("   Step 4: Configure config.yaml")
 	fmt.Println("   1. Set default_provider to your chosen provider")
 	fmt.Println("   2. Add your API key under that provider's section")
 	fmt.Println()
@@ -209,10 +209,10 @@ func printFirstRunHelp() {
 }
 
 func printPlaceholderKeyHelp(provider string) {
-	fmt.Printf("⚠️  API key not configured for '%s'\n\n", provider)
+	fmt.Printf("!! API key not configured for '%s'\n\n", provider)
 	fmt.Println("It looks like you haven't added your API key yet.")
 	fmt.Println()
-	fmt.Println("🔑 Get an API key:")
+	fmt.Println(" Get an API key:")
 	fmt.Println()
 
 	switch provider {
@@ -229,7 +229,7 @@ func printPlaceholderKeyHelp(provider string) {
 	}
 
 	fmt.Println()
-	fmt.Println("✏️  Then edit your config.yaml and replace the placeholder with your real API key:")
+	fmt.Println("   Then edit your config.yaml and replace the placeholder with your real API key:")
 	fmt.Println()
 	fmt.Println("   providers:")
 	fmt.Printf("     %s:\n", provider)
@@ -238,7 +238,7 @@ func printPlaceholderKeyHelp(provider string) {
 }
 
 func printQuickHelp() {
-	fmt.Println("💡 Quick troubleshooting:")
+	fmt.Println("  Quick troubleshooting:")
 	fmt.Println()
 	fmt.Println("   1. Make sure config.yaml exists in current directory or ~/.config/ask/")
 	fmt.Println("   2. Check that default_provider is set")
@@ -254,15 +254,15 @@ func printAvailableModels() {
 
 	// If no config, show fallback models cleanly
 	if err != nil {
-		fmt.Println("📋 Available Models (default list)")
+		fmt.Println("  Available Models (default list)")
 		fmt.Println()
-		fmt.Println("💡 Configure your API keys in config.yaml to see live models from providers")
+		fmt.Println("  Configure your API keys in config.yaml to see live models from providers")
 		fmt.Println()
 		printFallbackModels()
 		return
 	}
 
-	fmt.Println("📋 Fetching Available Models...")
+	fmt.Println("  Fetching Available Models...")
 	fmt.Println()
 
 	providers := []struct {
