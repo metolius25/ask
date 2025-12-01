@@ -8,7 +8,7 @@
 
 ## ✨ Features
 
-- 🚀 **Simple Usage** - Just type `ask [your question]` - no quotes needed
+- 🚀 **Simple Usage** - Just type `ask [your question]` 
 - 🎨 **Beautiful Output** - Markdown rendering with syntax highlighting
 - 🤖 **Multi-Provider** - Supports Gemini, Claude, ChatGPT, and DeepSeek
 - 🔄 **Dynamic Models** - Automatically fetches latest models from APIs
