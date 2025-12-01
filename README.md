@@ -6,7 +6,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
 [![Version](https://img.shields.io/badge/version-0.2.0-blue)](https://github.com/yourusername/ask/releases)
 
-## ✨ Features
+## Features
 
 - 🚀 **Simple Usage** - Just type `ask [your question]` 
 - 🎨 **Beautiful Output** - Markdown rendering with syntax highlighting
@@ -14,7 +14,7 @@
 - 🔄 **Dynamic Models** - Automatically fetches latest models from APIs
 - 📋 **Model Discovery** - `--list-models` shows all available models
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Clone the repository
@@ -175,7 +175,7 @@ ask --list-models
 This fetches the latest models directly from each provider's API (for configured providers) and shows:
 - All supported models per provider
 - Which model is the default for each
-- Model descriptions (where available)
+- Model descriptions (if available)
 
 No configuration needed to see default models!
 
