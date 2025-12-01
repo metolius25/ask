@@ -9,20 +9,16 @@
 ## ✨ Features
 
 - 🚀 **Simple Usage** - Just type `ask [your question]` - no quotes needed
-- ⚡ **Real-time Streaming** - Watch responses appear as they're generated
 - 🎨 **Beautiful Output** - Markdown rendering with syntax highlighting
 - 🤖 **Multi-Provider** - Supports Gemini, Claude, ChatGPT, and DeepSeek
 - 🔄 **Dynamic Models** - Automatically fetches latest models from APIs
-- 🔧 **Interactive Setup** - Configuration wizard for easy model selection
-- ⚙️ **Zero Hardcoding** - All defaults are user-configurable
-- 🎯 **Runtime Selection** - Override provider and model via CLI flags
 - 📋 **Model Discovery** - `--list-models` shows all available models
 
 ## 🚀 Quick Start
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ask
+git clone https://github.com/metolius25/ask
 cd ask
 
 # Install dependencies
@@ -159,13 +155,13 @@ Override the model with the `-model` flag:
 
 ```bash
 ask -model gemini-1.5-pro Explain Einstein's theory of relativity
-ask -model gpt-4o-mini Quick summary of Go
+ask -model gpt-4o-mini Quick summary of Battle of Tannenberg
 ```
 
 Combine both flags:
 
 ```bash
-ask -provider claude -model claude-3-opus-20240229 Write a detailed analysis
+ask -provider claude -model claude-3-opus-20240229 Write a hello world program in Go
 ```
 
 ### List Available Models
@@ -191,30 +187,6 @@ Get usage information:
 ask -h
 # or
 ask --help
-```
-
-## Project Structure
-
-```
-ask/
-├── main.go                  # CLI entry point & flag parsing
-├── version.go               # Version constants  
-├── config.go                # Configuration management
-├── models.go                # User preferences loader
-├── configure.go             # Interactive setup wizard
-├── provider/
-│   ├── provider.go          # Provider interface
-│   ├── gemini.go            # Gemini implementation
-│   ├── claude.go            # Claude implementation
-│   ├── chatgpt.go           # ChatGPT implementation
-│   └── deepseek.go          # DeepSeek implementation
-├── config.yaml              # Your API keys (not in git)
-├── defaults.yaml            # Your model preferences (not in git)
-├── config.yaml.example      # Configuration template
-├── defaults.yaml.example    # Preferences template
-├── LICENSE                  # MIT License
-├── CHANGELOG.md             # Version history
-└── README.md
 ```
 
 ## Troubleshooting
