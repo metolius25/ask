@@ -5,6 +5,12 @@ package provider
 
 import "io"
 
+// Message represents a single message in a conversation
+type Message struct {
+	Role    string // "user" or "assistant"
+	Content string
+}
+
 // ModelInfo contains information about an available model
 type ModelInfo struct {
 	ID          string
@@ -16,6 +22,9 @@ type ModelInfo struct {
 type Provider interface {
 	// QueryStream sends a prompt and streams the response to the writer in real-time
 	QueryStream(prompt string, writer io.Writer) error
+
+	// QueryStreamWithHistory sends a prompt with conversation history and streams the response
+	QueryStreamWithHistory(messages []Message, writer io.Writer) error
 
 	// ListModels returns available models for this provider
 	ListModels() ([]ModelInfo, error)

@@ -122,6 +122,83 @@ func (c *ClaudeProvider) QueryStream(prompt string, writer io.Writer) error {
 	return nil
 }
 
+func (c *ClaudeProvider) QueryStreamWithHistory(messages []Message, writer io.Writer) error {
+	// Convert our Message type to Claude's message format
+	var claudeMessages []claudeMessage
+	for _, msg := range messages {
+		claudeMessages = append(claudeMessages, claudeMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		})
+	}
+
+	reqBody := claudeRequest{
+		Model:     c.model,
+		Messages:  claudeMessages,
+		MaxTokens: 4096,
+		Stream:    true,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", c.apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Parse SSE stream
+	buf := make([]byte, 4096)
+
+	for {
+		n, err := resp.Body.Read(buf)
+		if err != nil && err != io.EOF {
+			return fmt.Errorf("error reading stream: %w", err)
+		}
+		if n == 0 {
+			break
+		}
+
+		// Parse SSE events
+		lines := strings.Split(string(buf[:n]), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "data: ") {
+				data := strings.TrimPrefix(line, "data: ")
+				if data == "[DONE]" {
+					continue
+				}
+
+				var event claudeStreamEvent
+				if err := json.Unmarshal([]byte(data), &event); err == nil {
+					if event.Type == "content_block_delta" && event.Delta.Text != "" {
+						fmt.Fprint(writer, event.Delta.Text)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (c *ClaudeProvider) ListModels() ([]ModelInfo, error) {
 	req, err := http.NewRequest("GET", "https://api.anthropic.com/v1/models", nil)
 	if err != nil {

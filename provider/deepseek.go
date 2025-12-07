@@ -114,6 +114,76 @@ func (d *DeepSeekProvider) QueryStream(prompt string, writer io.Writer) error {
 	return nil
 }
 
+func (d *DeepSeekProvider) QueryStreamWithHistory(messages []Message, writer io.Writer) error {
+	// Convert our Message type to DeepSeek's message format
+	var deepseekMessages []deepseekMessage
+	for _, msg := range messages {
+		deepseekMessages = append(deepseekMessages, deepseekMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		})
+	}
+
+	reqBody := deepseekRequest{
+		Model:    d.model,
+		Messages: deepseekMessages,
+		Stream:   true,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.deepseek.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+d.apiKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Parse SSE stream
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "data: ") {
+			data := strings.TrimPrefix(line, "data: ")
+			if data == "[DONE]" {
+				break
+			}
+
+			var streamResp deepseekStreamResponse
+			if err := json.Unmarshal([]byte(data), &streamResp); err == nil {
+				if len(streamResp.Choices) > 0 {
+					content := streamResp.Choices[0].Delta.Content
+					if content != "" {
+						fmt.Fprint(writer, content)
+					}
+				}
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading stream: %w", err)
+	}
+
+	return nil
+}
+
 func (d *DeepSeekProvider) ListModels() ([]ModelInfo, error) {
 	req, err := http.NewRequest("GET", "https://api.deepseek.com/v1/models", nil)
 	if err != nil {

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
@@ -21,6 +22,7 @@ func main() {
 	listModels := flag.Bool("list-models", false, "List available models for all providers")
 	configureFlag := flag.Bool("configure", false, "Configure default models interactively")
 	versionFlag := flag.Bool("version", false, "Show version information")
+	sessionFlag := flag.Bool("S", false, "Start interactive session mode")
 
 	// Custom usage message
 	flag.Usage = func() {
@@ -35,6 +37,7 @@ func main() {
 		fmt.Println("  ask -provider claude Explain quantum computing")
 		fmt.Println("  ask -model gpt-4o-mini Write a haiku about Go")
 		fmt.Println("  ask -provider gemini -model gemini-1.5-pro Tell me a joke")
+		fmt.Println("  ask -S  # Start interactive session mode")
 		fmt.Println("  ask --list-models")
 		fmt.Println("  ask --version")
 		fmt.Println("  ask --configure")
@@ -60,6 +63,81 @@ func main() {
 	// Handle list-models command
 	if *listModels {
 		printAvailableModels()
+		os.Exit(0)
+	}
+
+	// Handle session mode
+	if *sessionFlag {
+		// Load configuration
+		config, err := LoadConfig()
+		if err != nil {
+			// Check for specific error types and provide helpful messages
+			switch e := err.(type) {
+			case *ConfigNotFoundError:
+				printFirstRunHelp()
+			case *PlaceholderKeyError:
+				printPlaceholderKeyHelp(e.Provider)
+			default:
+				fmt.Fprintf(os.Stderr, "❌ Error loading config: %v\n\n", err)
+				printQuickHelp()
+			}
+			os.Exit(1)
+		}
+
+		// Determine which provider to use (flag overrides config)
+		selectedProvider := config.DefaultProvider
+		if *providerFlag != "" {
+			selectedProvider = *providerFlag
+		}
+
+		// Validate provider exists
+		providerConfig, exists := config.Providers[selectedProvider]
+		if !exists {
+			fmt.Fprintf(os.Stderr, "❌ Provider '%s' not found in config\n\n", selectedProvider)
+			fmt.Fprintf(os.Stderr, "Available providers in your config: %s\n", getConfiguredProviders(config))
+			fmt.Fprintf(os.Stderr, "Add configuration for '%s' in your config.yaml\n", selectedProvider)
+			os.Exit(1)
+		}
+
+		// Check for placeholder key
+		if isPlaceholderKey(providerConfig.APIKey) {
+			printPlaceholderKeyHelp(selectedProvider)
+			os.Exit(1)
+		}
+
+		// Determine which model to use (flag overrides config)
+		selectedModel := providerConfig.Model
+		if *modelFlag != "" {
+			selectedModel = *modelFlag
+		}
+
+		// If still empty, use default
+		if selectedModel == "" {
+			selectedModel = GetDefaultModel(selectedProvider)
+		}
+
+		// Create the appropriate provider
+		var p provider.Provider
+		switch selectedProvider {
+		case "gemini":
+			p = provider.NewGeminiProvider(providerConfig.APIKey, selectedModel)
+		case "claude":
+			p = provider.NewClaudeProvider(providerConfig.APIKey, selectedModel)
+		case "chatgpt":
+			p = provider.NewChatGPTProvider(providerConfig.APIKey, selectedModel)
+		case "deepseek":
+			p = provider.NewDeepSeekProvider(providerConfig.APIKey, selectedModel)
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown provider: %s\n", selectedProvider)
+			fmt.Fprintf(os.Stderr, "Supported providers: gemini, claude, chatgpt, deepseek\n")
+			os.Exit(1)
+		}
+
+		// Run interactive session
+		if err := runInteractiveSession(p, selectedProvider, selectedModel); err != nil {
+			fmt.Fprintf(os.Stderr, "\n❌ Session error: %v\n", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
@@ -395,4 +473,107 @@ func getConfiguredProviders(config *Config) string {
 		providers = append(providers, name)
 	}
 	return strings.Join(providers, ", ")
+}
+
+func runInteractiveSession(p provider.Provider, providerName, modelName string) error {
+	session := NewSession()
+
+	// Print welcome message
+	fmt.Printf("\n╭───────────────────────────────────────────────╮\n")
+	fmt.Printf("│  🤖 Interactive Session Mode                 │\n")
+	fmt.Printf("│  Provider: %-33s │\n", providerName)
+	fmt.Printf("│  Model: %-36s │\n", modelName)
+	fmt.Printf("╰───────────────────────────────────────────────╯\n\n")
+	fmt.Println("Commands:")
+	fmt.Println("  /exit or /quit  - Exit session")
+	fmt.Println("  /clear          - Clear conversation history")
+	fmt.Println("  /help           - Show this help message")
+	fmt.Println()
+
+	// REPL loop
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		// Display prompt
+		fmt.Print("\n\033[1;36mYou >\033[0m ")
+
+		// Read user input
+		if !scanner.Scan() {
+			break
+		}
+		input := scanner.Text()
+
+		// Handle empty input
+		if strings.TrimSpace(input) == "" {
+			continue
+		}
+
+		// Handle commands
+		if strings.HasPrefix(input, "/") {
+			switch strings.ToLower(strings.TrimSpace(input)) {
+			case "/exit", "/quit":
+				fmt.Println("\n👋 Goodbye!")
+				return nil
+
+			case "/clear":
+				session.Clear()
+				fmt.Println("✨ Conversation history cleared")
+				continue
+
+			case "/help":
+				fmt.Println("\nAvailable commands:")
+				fmt.Println("  /exit or /quit  - Exit session")
+				fmt.Println("  /clear          - Clear conversation history")
+				fmt.Println("  /help           - Show this help message")
+				continue
+
+			default:
+				fmt.Printf("Unknown command: %s (type /help for available commands)\n", input)
+				continue
+			}
+		}
+
+		// Add user message to session
+		session.AddMessage("user", input)
+
+		// Print assistant prompt
+		fmt.Print("\n\033[1;32mAssistant >\033[0m\n")
+
+		// Convert session messages to provider.Message format
+		sessionMessages := session.GetMessages()
+		var providerMessages []provider.Message
+		for _, msg := range sessionMessages {
+			providerMessages = append(providerMessages, provider.Message{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+		}
+
+		// Stream response
+		var responseBuffer strings.Builder
+		if err := p.QueryStreamWithHistory(providerMessages, &responseBuffer); err != nil {
+			fmt.Fprintf(os.Stderr, "\n❌ Error: %v\n", err)
+			// Remove the last user message since we got an error
+			if session.MessageCount() > 0 {
+				session.messages = session.messages[:len(session.messages)-1]
+			}
+			continue
+		}
+
+		// Add assistant response to session
+		response := responseBuffer.String()
+		session.AddMessage("assistant", response)
+
+		// Render markdown
+		fmt.Println()
+		if err := renderMarkdown(response); err != nil {
+			// Fallback to plain text
+			fmt.Println(response)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("input error: %w", err)
+	}
+
+	return nil
 }

@@ -13,6 +13,7 @@
 - 🤖 **Multi-Provider** - Supports Gemini, Claude, ChatGPT, and DeepSeek
 - 🔄 **Dynamic Models** - Automatically fetches latest models from APIs
 - 📋 **Model Discovery** - `--list-models` shows all available models
+- 💬 **Interactive Sessions** - Multi-turn conversations with `-S` flag
 
 ## Quick Start
 
@@ -164,6 +165,59 @@ Combine both flags:
 ask -provider claude -model claude-3-opus-20240229 Write a hello world program in Go
 ```
 
+### Interactive Session Mode
+
+Start an interactive chat session for multi-turn conversations:
+
+```bash
+ask -S
+```
+
+This launches a beautiful TUI where you can have extended conversations with the AI. The conversation history is maintained in memory during the session, allowing the AI to remember context across multiple exchanges.
+
+**Session Commands:**
+- `/exit` or `/quit` - Exit the session
+- `/clear` - Clear conversation history
+- `/help` - Show available commands
+
+**Example Session:**
+```bash
+$ ask -S
+
+╭───────────────────────────────────────────────╮
+│  🤖 Interactive Session Mode                 │
+│  Provider: gemini                             │
+│  Model: gemini-2.5-flash                      │
+╰───────────────────────────────────────────────╯
+
+Commands:
+  /exit or /quit  - Exit session
+  /clear          - Clear conversation history
+  /help           - Show this help message
+
+You > What is the capital of France?
+
+Assistant >
+The capital of France is **Paris**.
+
+You > What is its population?
+
+Assistant >
+Paris has a population of approximately **2.2 million** people within the city limits...
+
+You > /exit
+
+👋 Goodbye!
+```
+
+You can also specify provider and model for the session:
+
+```bash
+ask -S -provider claude -model claude-3-5-sonnet-20241022
+```
+
+**Privacy Note:** All conversation history is ephemeral and stored only in memory. It is completely destroyed when you exit the session - nothing is saved to disk.
+
 ### List Available Models
 
 See all available models for each provider:
@@ -222,8 +276,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Future Features
 
-- Interactive chat mode with `-S` flag
-- Conversation history
 - Custom system prompts
 - Token usage tracking
 

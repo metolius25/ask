@@ -105,6 +105,105 @@ func (g *GeminiProvider) QueryStream(prompt string, writer io.Writer) error {
 	return nil
 }
 
+func (g *GeminiProvider) QueryStreamWithHistory(messages []Message, writer io.Writer) error {
+	ctx := context.Background()
+
+	client, err := genai.NewClient(ctx, option.WithAPIKey(g.apiKey))
+	if err != nil {
+		return fmt.Errorf("failed to create Gemini client: %w", err)
+	}
+	defer client.Close()
+
+	// Normalize model name (remove "models/" prefix if present)
+	modelName := g.model
+
+	// If no model specified, use first available from fallback
+	if modelName == "" {
+		fallbackModels := getFallbackGeminiModels()
+		if len(fallbackModels) > 0 {
+			modelName = fallbackModels[0].ID
+		}
+	}
+
+	if len(modelName) > 7 && modelName[:7] == "models/" {
+		modelName = modelName[7:]
+	}
+
+	model := client.GenerativeModel(modelName)
+
+	// Configure safety settings to be less restrictive
+	model.SafetySettings = []*genai.SafetySetting{
+		{
+			Category:  genai.HarmCategoryHarassment,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+		{
+			Category:  genai.HarmCategoryHateSpeech,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+		{
+			Category:  genai.HarmCategorySexuallyExplicit,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+		{
+			Category:  genai.HarmCategoryDangerousContent,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+	}
+
+	// Start a chat session
+	cs := model.StartChat()
+
+	// Add history (all messages except the last one)
+	for i := 0; i < len(messages)-1; i++ {
+		msg := messages[i]
+		role := "user"
+		if msg.Role == "assistant" {
+			role = "model"
+		}
+		cs.History = append(cs.History, &genai.Content{
+			Parts: []genai.Part{genai.Text(msg.Content)},
+			Role:  role,
+		})
+	}
+
+	// Send the last message (the current user prompt)
+	lastMessage := messages[len(messages)-1]
+	iter := cs.SendMessageStream(ctx, genai.Text(lastMessage.Content))
+	hasContent := false
+
+	for {
+		resp, err := iter.Next()
+		if err != nil {
+			// Check if we've reached the end of the stream
+			if err.Error() == "no more items in iterator" {
+				break
+			}
+			return fmt.Errorf("error during streaming: %w", err)
+		}
+
+		for _, cand := range resp.Candidates {
+			// Check if response was blocked
+			if cand.FinishReason != 0 && cand.FinishReason != 1 { // 0=UNSPECIFIED, 1=STOP (normal)
+				return fmt.Errorf("response blocked (reason: %v). This may be due to safety filters", cand.FinishReason)
+			}
+
+			if cand.Content != nil {
+				for _, part := range cand.Content.Parts {
+					fmt.Fprint(writer, part)
+					hasContent = true
+				}
+			}
+		}
+	}
+
+	if !hasContent {
+		return fmt.Errorf("no content received from model - response may have been filtered")
+	}
+
+	return nil
+}
+
 func (g *GeminiProvider) ListModels() ([]ModelInfo, error) {
 	ctx := context.Background()
 
