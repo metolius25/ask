@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"os"
@@ -17,7 +16,7 @@ import (
 
 func main() {
 	// Define flags
-	providerFlag := flag.String("provider", "", "AI provider to use (gemini, claude, chatgpt, deepseek)")
+	providerFlag := flag.String("provider", "", "AI provider to use (gemini, claude, chatgpt, deepseek, mistral)")
 	modelFlag := flag.String("model", "", "Model to use (overrides config)")
 	listModels := flag.Bool("list-models", false, "List available models for all providers")
 	configureFlag := flag.Bool("configure", false, "Configure default models interactively")
@@ -78,7 +77,7 @@ func main() {
 			case *PlaceholderKeyError:
 				printPlaceholderKeyHelp(e.Provider)
 			default:
-				fmt.Fprintf(os.Stderr, "❌ Error loading config: %v\n\n", err)
+				fmt.Fprintf(os.Stderr, "[!] Error loading config: %v\n\n", err)
 				printQuickHelp()
 			}
 			os.Exit(1)
@@ -93,7 +92,7 @@ func main() {
 		// Validate provider exists
 		providerConfig, exists := config.Providers[selectedProvider]
 		if !exists {
-			fmt.Fprintf(os.Stderr, "❌ Provider '%s' not found in config\n\n", selectedProvider)
+			fmt.Fprintf(os.Stderr, "[!] Provider '%s' not found in config\n\n", selectedProvider)
 			fmt.Fprintf(os.Stderr, "Available providers in your config: %s\n", getConfiguredProviders(config))
 			fmt.Fprintf(os.Stderr, "Add configuration for '%s' in your config.yaml\n", selectedProvider)
 			os.Exit(1)
@@ -120,22 +119,39 @@ func main() {
 		var p provider.Provider
 		switch selectedProvider {
 		case "gemini":
+			if selectedModel == "" {
+				selectedModel = "gemini-2.5-flash" // Fallback
+			}
 			p = provider.NewGeminiProvider(providerConfig.APIKey, selectedModel)
 		case "claude":
+			if selectedModel == "" {
+				selectedModel = "claude-3-5-sonnet-20241022" // Fallback
+			}
 			p = provider.NewClaudeProvider(providerConfig.APIKey, selectedModel)
 		case "chatgpt":
+			if selectedModel == "" {
+				selectedModel = "gpt-4o" // Fallback
+			}
 			p = provider.NewChatGPTProvider(providerConfig.APIKey, selectedModel)
 		case "deepseek":
+			if selectedModel == "" {
+				selectedModel = "deepseek-chat" // Fallback
+			}
 			p = provider.NewDeepSeekProvider(providerConfig.APIKey, selectedModel)
+		case "mistral":
+			if selectedModel == "" {
+				selectedModel = "mistral-large-latest" // Fallback
+			}
+			p = provider.NewMistralProvider(providerConfig.APIKey, selectedModel)
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown provider: %s\n", selectedProvider)
-			fmt.Fprintf(os.Stderr, "Supported providers: gemini, claude, chatgpt, deepseek\n")
+			fmt.Fprintf(os.Stderr, "Supported providers: gemini, claude, chatgpt, deepseek, mistral\n")
 			os.Exit(1)
 		}
 
-		// Run interactive session
-		if err := runInteractiveSession(p, selectedProvider, selectedModel); err != nil {
-			fmt.Fprintf(os.Stderr, "\n❌ Session error: %v\n", err)
+		// Run interactive session TUI
+		if err := RunSessionTUI(p, selectedProvider, selectedModel); err != nil {
+			fmt.Fprintf(os.Stderr, "\n[!] Session error: %v\n", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -160,7 +176,7 @@ func main() {
 		case *PlaceholderKeyError:
 			printPlaceholderKeyHelp(e.Provider)
 		default:
-			fmt.Fprintf(os.Stderr, "❌ Error loading config: %v\n\n", err)
+			fmt.Fprintf(os.Stderr, "[!] Error loading config: %v\n\n", err)
 			printQuickHelp()
 		}
 		os.Exit(1)
@@ -175,7 +191,7 @@ func main() {
 	// Validate provider exists
 	providerConfig, exists := config.Providers[selectedProvider]
 	if !exists {
-		fmt.Fprintf(os.Stderr, "❌ Provider '%s' not found in config\n\n", selectedProvider)
+		fmt.Fprintf(os.Stderr, "[!] Provider '%s' not found in config\n\n", selectedProvider)
 		fmt.Fprintf(os.Stderr, "Available providers in your config: %s\n", getConfiguredProviders(config))
 		fmt.Fprintf(os.Stderr, "Add configuration for '%s' in your config.yaml\n", selectedProvider)
 		os.Exit(1)
@@ -209,9 +225,11 @@ func main() {
 		p = provider.NewChatGPTProvider(providerConfig.APIKey, selectedModel)
 	case "deepseek":
 		p = provider.NewDeepSeekProvider(providerConfig.APIKey, selectedModel)
+	case "mistral":
+		p = provider.NewMistralProvider(providerConfig.APIKey, selectedModel)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown provider: %s\n", selectedProvider)
-		fmt.Fprintf(os.Stderr, "Supported providers: gemini, claude, chatgpt, deepseek\n")
+		fmt.Fprintf(os.Stderr, "Supported providers: gemini, claude, chatgpt, deepseek, mistral\n")
 		os.Exit(1)
 	}
 
@@ -351,13 +369,14 @@ func printAvailableModels() {
 		{"claude", "claude"},
 		{"chatgpt", "chatgpt"},
 		{"deepseek", "deepseek"},
+		{"mistral", "mistral"},
 	}
 
 	for _, p := range providers {
 		// Check if provider is configured
 		providerConfig, exists := config.Providers[p.name]
 		if !exists || providerConfig.APIKey == "" || isPlaceholderKey(providerConfig.APIKey) {
-			fmt.Printf("🤖 %s (not configured)\n", strings.ToUpper(p.name))
+			fmt.Printf("[>] %s (not configured)\n", strings.ToUpper(p.name))
 
 			// Show fallback models from the provider's own implementation
 			var prov provider.Provider
@@ -370,6 +389,8 @@ func printAvailableModels() {
 				prov = provider.NewChatGPTProvider("", "")
 			case "deepseek":
 				prov = provider.NewDeepSeekProvider("", "")
+			case "mistral":
+				prov = provider.NewMistralProvider("", "")
 			}
 
 			models, _ := prov.ListModels()
@@ -396,18 +417,20 @@ func printAvailableModels() {
 			prov = provider.NewChatGPTProvider(providerConfig.APIKey, "")
 		case "deepseek":
 			prov = provider.NewDeepSeekProvider(providerConfig.APIKey, "")
+		case "mistral":
+			prov = provider.NewMistralProvider(providerConfig.APIKey, "")
 		}
 		// Fetch models
 		models, err := prov.ListModels()
 		if err != nil || len(models) == 0 {
-			fmt.Printf("🤖 %s (API error - showing defaults)\n", strings.ToUpper(p.name))
+			fmt.Printf("[>] %s (API error - showing defaults)\n", strings.ToUpper(p.name))
 			fmt.Println()
 			continue
 		}
 
 		defaultModel := GetDefaultModel(p.name)
 
-		fmt.Printf("🤖 %s ✓\n", strings.ToUpper(p.name))
+		fmt.Printf("[>] %s ✓\n", strings.ToUpper(p.name))
 		for _, model := range models {
 			modelID := model.ID
 			// Clean up Gemini model names (remove "models/" prefix if present)
@@ -444,6 +467,7 @@ func printFallbackModels() {
 		{"claude", provider.NewClaudeProvider("", "")},
 		{"chatgpt", provider.NewChatGPTProvider("", "")},
 		{"deepseek", provider.NewDeepSeekProvider("", "")},
+		{"mistral", provider.NewMistralProvider("", "")},
 	}
 
 	for _, p := range providers {
@@ -451,7 +475,7 @@ func printFallbackModels() {
 		models, _ := p.provider.ListModels()
 		defaultModel := GetDefaultModel(p.name)
 
-		fmt.Printf("🤖 %s\n", strings.ToUpper(p.name))
+		fmt.Printf("[>] %s\n", strings.ToUpper(p.name))
 		for _, model := range models {
 			if model.ID == defaultModel {
 				fmt.Printf("   • %s (default)\n", model.ID)
@@ -473,107 +497,4 @@ func getConfiguredProviders(config *Config) string {
 		providers = append(providers, name)
 	}
 	return strings.Join(providers, ", ")
-}
-
-func runInteractiveSession(p provider.Provider, providerName, modelName string) error {
-	session := NewSession()
-
-	// Print welcome message
-	fmt.Printf("\n╭───────────────────────────────────────────────╮\n")
-	fmt.Printf("│  🤖 Interactive Session Mode                 │\n")
-	fmt.Printf("│  Provider: %-33s │\n", providerName)
-	fmt.Printf("│  Model: %-36s │\n", modelName)
-	fmt.Printf("╰───────────────────────────────────────────────╯\n\n")
-	fmt.Println("Commands:")
-	fmt.Println("  /exit or /quit  - Exit session")
-	fmt.Println("  /clear          - Clear conversation history")
-	fmt.Println("  /help           - Show this help message")
-	fmt.Println()
-
-	// REPL loop
-	scanner := bufio.NewScanner(os.Stdin)
-	for {
-		// Display prompt
-		fmt.Print("\n\033[1;36mYou >\033[0m ")
-
-		// Read user input
-		if !scanner.Scan() {
-			break
-		}
-		input := scanner.Text()
-
-		// Handle empty input
-		if strings.TrimSpace(input) == "" {
-			continue
-		}
-
-		// Handle commands
-		if strings.HasPrefix(input, "/") {
-			switch strings.ToLower(strings.TrimSpace(input)) {
-			case "/exit", "/quit":
-				fmt.Println("\n👋 Goodbye!")
-				return nil
-
-			case "/clear":
-				session.Clear()
-				fmt.Println("✨ Conversation history cleared")
-				continue
-
-			case "/help":
-				fmt.Println("\nAvailable commands:")
-				fmt.Println("  /exit or /quit  - Exit session")
-				fmt.Println("  /clear          - Clear conversation history")
-				fmt.Println("  /help           - Show this help message")
-				continue
-
-			default:
-				fmt.Printf("Unknown command: %s (type /help for available commands)\n", input)
-				continue
-			}
-		}
-
-		// Add user message to session
-		session.AddMessage("user", input)
-
-		// Print assistant prompt
-		fmt.Print("\n\033[1;32mAssistant >\033[0m\n")
-
-		// Convert session messages to provider.Message format
-		sessionMessages := session.GetMessages()
-		var providerMessages []provider.Message
-		for _, msg := range sessionMessages {
-			providerMessages = append(providerMessages, provider.Message{
-				Role:    msg.Role,
-				Content: msg.Content,
-			})
-		}
-
-		// Stream response
-		var responseBuffer strings.Builder
-		if err := p.QueryStreamWithHistory(providerMessages, &responseBuffer); err != nil {
-			fmt.Fprintf(os.Stderr, "\n❌ Error: %v\n", err)
-			// Remove the last user message since we got an error
-			if session.MessageCount() > 0 {
-				session.messages = session.messages[:len(session.messages)-1]
-			}
-			continue
-		}
-
-		// Add assistant response to session
-		response := responseBuffer.String()
-		session.AddMessage("assistant", response)
-
-		// Render markdown
-		fmt.Println()
-		if err := renderMarkdown(response); err != nil {
-			// Fallback to plain text
-			fmt.Println(response)
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("input error: %w", err)
-	}
-
-	return nil
 }

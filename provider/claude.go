@@ -85,7 +85,7 @@ func (c *ClaudeProvider) QueryStream(prompt string, writer io.Writer) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return HandleAPIError(resp.StatusCode, body, "Claude")
 	}
 
 	// Parse SSE stream
@@ -126,10 +126,7 @@ func (c *ClaudeProvider) QueryStreamWithHistory(messages []Message, writer io.Wr
 	// Convert our Message type to Claude's message format
 	var claudeMessages []claudeMessage
 	for _, msg := range messages {
-		claudeMessages = append(claudeMessages, claudeMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		})
+		claudeMessages = append(claudeMessages, claudeMessage(msg))
 	}
 
 	reqBody := claudeRequest{
@@ -162,7 +159,7 @@ func (c *ClaudeProvider) QueryStreamWithHistory(messages []Message, writer io.Wr
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return HandleAPIError(resp.StatusCode, body, "Claude")
 	}
 
 	// Parse SSE stream

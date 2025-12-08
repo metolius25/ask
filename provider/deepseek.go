@@ -82,7 +82,7 @@ func (d *DeepSeekProvider) QueryStream(prompt string, writer io.Writer) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return HandleAPIError(resp.StatusCode, body, "DeepSeek")
 	}
 
 	// Parse SSE stream
@@ -118,10 +118,7 @@ func (d *DeepSeekProvider) QueryStreamWithHistory(messages []Message, writer io.
 	// Convert our Message type to DeepSeek's message format
 	var deepseekMessages []deepseekMessage
 	for _, msg := range messages {
-		deepseekMessages = append(deepseekMessages, deepseekMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		})
+		deepseekMessages = append(deepseekMessages, deepseekMessage(msg))
 	}
 
 	reqBody := deepseekRequest{
@@ -152,7 +149,7 @@ func (d *DeepSeekProvider) QueryStreamWithHistory(messages []Message, writer io.
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return HandleAPIError(resp.StatusCode, body, "DeepSeek")
 	}
 
 	// Parse SSE stream

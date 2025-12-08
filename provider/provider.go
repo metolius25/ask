@@ -3,7 +3,24 @@
 // and dynamic model discovery.
 package provider
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
+
+// HandleAPIError returns a user-friendly error message for common API errors
+func HandleAPIError(statusCode int, body []byte, providerName string) error {
+	switch statusCode {
+	case 401:
+		return fmt.Errorf("[!] Invalid API key for %s. Check your config.yaml", providerName)
+	case 402:
+		return fmt.Errorf("[!] Insufficient balance/credits for %s. Please add funds to your account", providerName)
+	case 429:
+		return fmt.Errorf("[!] Rate limit exceeded for %s. Please wait and try again", providerName)
+	default:
+		return fmt.Errorf("API error (status %d): %s", statusCode, string(body))
+	}
+}
 
 // Message represents a single message in a conversation
 type Message struct {

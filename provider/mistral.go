@@ -10,37 +10,37 @@ import (
 	"strings"
 )
 
-type ChatGPTProvider struct {
+type MistralProvider struct {
 	apiKey string
 	model  string
 }
 
-func NewChatGPTProvider(apiKey, model string) *ChatGPTProvider {
+func NewMistralProvider(apiKey, model string) *MistralProvider {
 	// If no model specified, use first available from fallback list
 	if model == "" {
-		fallbackModels := getFallbackChatGPTModels()
+		fallbackModels := getFallbackMistralModels()
 		if len(fallbackModels) > 0 {
 			model = fallbackModels[0].ID
 		}
 	}
-	return &ChatGPTProvider{
+	return &MistralProvider{
 		apiKey: apiKey,
 		model:  model,
 	}
 }
 
-type chatGPTRequest struct {
+type mistralRequest struct {
 	Model    string           `json:"model"`
-	Messages []chatGPTMessage `json:"messages"`
+	Messages []mistralMessage `json:"messages"`
 	Stream   bool             `json:"stream"`
 }
 
-type chatGPTMessage struct {
+type mistralMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-type chatGPTStreamResponse struct {
+type mistralStreamResponse struct {
 	Choices []struct {
 		Delta struct {
 			Content string `json:"content"`
@@ -48,10 +48,10 @@ type chatGPTStreamResponse struct {
 	} `json:"choices"`
 }
 
-func (c *ChatGPTProvider) QueryStream(prompt string, writer io.Writer) error {
-	reqBody := chatGPTRequest{
-		Model: c.model,
-		Messages: []chatGPTMessage{
+func (m *MistralProvider) QueryStream(prompt string, writer io.Writer) error {
+	reqBody := mistralRequest{
+		Model: m.model,
+		Messages: []mistralMessage{
 			{
 				Role:    "user",
 				Content: prompt,
@@ -65,13 +65,13 @@ func (c *ChatGPTProvider) QueryStream(prompt string, writer io.Writer) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://api.mistral.ai/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -82,7 +82,7 @@ func (c *ChatGPTProvider) QueryStream(prompt string, writer io.Writer) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return HandleAPIError(resp.StatusCode, body, "ChatGPT")
+		return HandleAPIError(resp.StatusCode, body, "Mistral")
 	}
 
 	// Parse SSE stream
@@ -95,7 +95,7 @@ func (c *ChatGPTProvider) QueryStream(prompt string, writer io.Writer) error {
 				break
 			}
 
-			var streamResp chatGPTStreamResponse
+			var streamResp mistralStreamResponse
 			if err := json.Unmarshal([]byte(data), &streamResp); err == nil {
 				if len(streamResp.Choices) > 0 {
 					content := streamResp.Choices[0].Delta.Content
@@ -114,16 +114,16 @@ func (c *ChatGPTProvider) QueryStream(prompt string, writer io.Writer) error {
 	return nil
 }
 
-func (c *ChatGPTProvider) QueryStreamWithHistory(messages []Message, writer io.Writer) error {
-	// Convert our Message type to ChatGPT's message format
-	var chatGPTMessages []chatGPTMessage
+func (m *MistralProvider) QueryStreamWithHistory(messages []Message, writer io.Writer) error {
+	// Convert our Message type to Mistral's message format
+	var mistralMessages []mistralMessage
 	for _, msg := range messages {
-		chatGPTMessages = append(chatGPTMessages, chatGPTMessage(msg))
+		mistralMessages = append(mistralMessages, mistralMessage(msg))
 	}
 
-	reqBody := chatGPTRequest{
-		Model:    c.model,
-		Messages: chatGPTMessages,
+	reqBody := mistralRequest{
+		Model:    m.model,
+		Messages: mistralMessages,
 		Stream:   true,
 	}
 
@@ -132,13 +132,13 @@ func (c *ChatGPTProvider) QueryStreamWithHistory(messages []Message, writer io.W
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://api.mistral.ai/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -149,7 +149,7 @@ func (c *ChatGPTProvider) QueryStreamWithHistory(messages []Message, writer io.W
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return HandleAPIError(resp.StatusCode, body, "ChatGPT")
+		return HandleAPIError(resp.StatusCode, body, "Mistral")
 	}
 
 	// Parse SSE stream
@@ -162,7 +162,7 @@ func (c *ChatGPTProvider) QueryStreamWithHistory(messages []Message, writer io.W
 				break
 			}
 
-			var streamResp chatGPTStreamResponse
+			var streamResp mistralStreamResponse
 			if err := json.Unmarshal([]byte(data), &streamResp); err == nil {
 				if len(streamResp.Choices) > 0 {
 					content := streamResp.Choices[0].Delta.Content
@@ -181,23 +181,23 @@ func (c *ChatGPTProvider) QueryStreamWithHistory(messages []Message, writer io.W
 	return nil
 }
 
-func (c *ChatGPTProvider) ListModels() ([]ModelInfo, error) {
-	req, err := http.NewRequest("GET", "https://api.openai.com/v1/models", nil)
+func (m *MistralProvider) ListModels() ([]ModelInfo, error) {
+	req, err := http.NewRequest("GET", "https://api.mistral.ai/v1/models", nil)
 	if err != nil {
-		return getFallbackChatGPTModels(), nil
+		return getFallbackMistralModels(), nil
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return getFallbackChatGPTModels(), nil
+		return getFallbackMistralModels(), nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return getFallbackChatGPTModels(), nil
+		return getFallbackMistralModels(), nil
 	}
 
 	var result struct {
@@ -208,38 +208,30 @@ func (c *ChatGPTProvider) ListModels() ([]ModelInfo, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return getFallbackChatGPTModels(), nil
+		return getFallbackMistralModels(), nil
 	}
 
 	if len(result.Data) == 0 {
-		return getFallbackChatGPTModels(), nil
+		return getFallbackMistralModels(), nil
 	}
 
 	var models []ModelInfo
-	// Filter for chat models only
 	for _, m := range result.Data {
-		if strings.Contains(m.ID, "gpt") || strings.Contains(m.ID, "o1") {
-			models = append(models, ModelInfo{
-				ID:          m.ID,
-				Name:        m.ID,
-				Description: "",
-			})
-		}
-	}
-
-	if len(models) == 0 {
-		return getFallbackChatGPTModels(), nil
+		models = append(models, ModelInfo{
+			ID:          m.ID,
+			Name:        m.ID,
+			Description: "",
+		})
 	}
 
 	return models, nil
 }
 
-func getFallbackChatGPTModels() []ModelInfo {
+func getFallbackMistralModels() []ModelInfo {
 	return []ModelInfo{
-		{ID: "gpt-4o", Name: "GPT-4o", Description: "Most capable multimodal model"},
-		{ID: "gpt-4o-mini", Name: "GPT-4o Mini", Description: "Fast and affordable"},
-		{ID: "gpt-4-turbo", Name: "GPT-4 Turbo", Description: "Advanced reasoning"},
-		{ID: "o1-preview", Name: "o1 Preview", Description: "Reasoning model"},
-		{ID: "o1-mini", Name: "o1 Mini", Description: "Lightweight reasoning"},
+		{ID: "mistral-large-latest", Name: "Mistral Large", Description: "Most capable model"},
+		{ID: "mistral-small-latest", Name: "Mistral Small", Description: "Fast and efficient"},
+		{ID: "codestral-latest", Name: "Codestral", Description: "Code generation"},
+		{ID: "ministral-8b-latest", Name: "Ministral 8B", Description: "Lightweight model"},
 	}
 }
