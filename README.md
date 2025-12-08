@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
 [![GitHub Release](https://img.shields.io/github/v/release/metolius25/ask)](https://github.com/metolius25/ask/releases)
+[![Build](https://github.com/metolius25/ask/actions/workflows/release.yml/badge.svg)](https://github.com/metolius25/ask/actions)
 
 ## Features
 
