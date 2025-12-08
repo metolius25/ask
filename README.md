@@ -139,7 +139,7 @@ ask Explain quantum computing in simple terms
 ask Write a haiku about programming
 ```
 
-The response will stream in real-time directly to your terminal.
+The response will be displayed in your terminal.
 
 ### Using Different Providers
 

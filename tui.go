@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os/user"
 	"strings"
-	"sync"
+	"time"
 
 	"ask/provider"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -42,35 +43,25 @@ type ChatMessage struct {
 	Content string
 }
 
-type streamChunkMsg string
-type streamDoneMsg struct{ err error }
-
-// streamWriter implements io.Writer and sends chunks to the program
-type streamWriter struct {
-	prog *tea.Program
-}
-
-func (w *streamWriter) Write(p []byte) (n int, err error) {
-	w.prog.Send(streamChunkMsg(string(p)))
-	return len(p), nil
+type queryDoneMsg struct {
+	err     error
+	content string
 }
 
 // SessionModel is the main TUI model
 type SessionModel struct {
-	provider      provider.Provider
-	providerName  string
-	modelName     string
-	username      string
-	messages      []ChatMessage
-	currentStream string
-	textarea      textarea.Model
-	viewport      viewport.Model
-	width         int
-	height        int
-	loading       bool
-	ready         bool
-	prog          *tea.Program
-	streamMu      sync.Mutex
+	provider     provider.Provider
+	providerName string
+	modelName    string
+	username     string
+	messages     []ChatMessage
+	textarea     textarea.Model
+	viewport     viewport.Model
+	spinner      spinner.Model
+	width        int
+	height       int
+	loading      bool
+	ready        bool
 }
 
 // NewSessionModel creates a new session
@@ -88,12 +79,17 @@ func NewSessionModel(p provider.Provider, providerName, modelName string) *Sessi
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
+	s := spinner.New()
+	s.Spinner = spinner.MiniDot
+	s.Style = lipgloss.NewStyle().Foreground(secondaryColor)
+
 	return &SessionModel{
 		provider:     p,
 		providerName: providerName,
 		modelName:    modelName,
 		username:     username,
 		textarea:     ta,
+		spinner:      s,
 		messages:     []ChatMessage{},
 	}
 }
@@ -126,12 +122,21 @@ func (m *SessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Add user message
 			m.messages = append(m.messages, ChatMessage{Role: "user", Content: input})
+
+			// Reset textarea completely
 			m.textarea.Reset()
+			m.textarea.SetValue("")
+			m.textarea.Blur()
+			m.textarea.Focus()
+
 			m.loading = true
-			m.currentStream = ""
 			m.refreshViewport()
 
-			return m, m.startStreaming(input)
+			// Start the spinner and the query
+			return m, tea.Batch(
+				m.spinner.Tick, // Use standard spinner tick
+				m.startQuery(input),
+			)
 
 		case tea.KeyUp, tea.KeyDown:
 			var cmd tea.Cmd
@@ -161,14 +166,14 @@ func (m *SessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshViewport()
 		return m, nil
 
-	case streamChunkMsg:
-		m.streamMu.Lock()
-		m.currentStream += string(msg)
-		m.streamMu.Unlock()
-		m.refreshViewport()
-		return m, nil
+	case spinner.TickMsg:
+		if m.loading {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
 
-	case streamDoneMsg:
+	case queryDoneMsg:
 		m.loading = false
 		if msg.err != nil {
 			m.messages = append(m.messages, ChatMessage{
@@ -176,17 +181,15 @@ func (m *SessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Content: fmt.Sprintf("Error: %v", msg.err),
 			})
 		} else {
-			m.streamMu.Lock()
-			content := m.currentStream
-			m.streamMu.Unlock()
 			m.messages = append(m.messages, ChatMessage{
 				Role:    "assistant",
-				Content: content,
+				Content: msg.content,
 			})
 		}
-		m.currentStream = ""
 		m.refreshViewport()
-		return m, nil
+		// Re-focus textarea
+		m.textarea.Focus()
+		return m, textarea.Blink
 	}
 
 	// Update textarea
@@ -194,6 +197,13 @@ func (m *SessionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.textarea, taCmd = m.textarea.Update(msg)
 
 	return m, taCmd
+}
+
+func (m *SessionModel) tickCmd() tea.Cmd {
+	// Deprecated in favor of spinner.Tick, keeping for interface if needed or just removing
+	return func() tea.Msg {
+		return spinner.TickMsg{Time: time.Now()}
+	}
 }
 
 func (m *SessionModel) View() string {
@@ -215,6 +225,9 @@ func (m *SessionModel) View() string {
 
 	// Status
 	status := helpStyle.Render("Ctrl+C: exit | /help: commands")
+	if m.loading {
+		status = m.spinner.View() + " Thinking..."
+	}
 
 	return header + "\n" + chatView + "\n" + inputSep + "\n" + input + "\n" + status
 }
@@ -251,22 +264,7 @@ func (m *SessionModel) refreshViewport() {
 		}
 	}
 
-	// Show current streaming content
-	if m.loading {
-		sb.WriteString(modelStyle.Render(m.modelName+" >") + "\n")
-		m.streamMu.Lock()
-		content := m.currentStream
-		m.streamMu.Unlock()
-		if content == "" {
-			sb.WriteString(lipgloss.NewStyle().Italic(true).Foreground(mutedColor).Render("Thinking..."))
-		} else {
-			// Wrap content to ensure viewport scrolls correctly
-			wrapped := lipgloss.NewStyle().Width(m.width - 4).Render(content)
-			sb.WriteString(wrapped)
-		}
-		sb.WriteString("\n")
-	}
-
+	// Scroll to bottom
 	m.viewport.SetContent(sb.String())
 	m.viewport.GotoBottom()
 }
@@ -309,10 +307,11 @@ func (m *SessionModel) handleCommand(input string) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m *SessionModel) startStreaming(input string) tea.Cmd {
+func (m *SessionModel) startQuery(input string) tea.Cmd {
 	return func() tea.Msg {
 		var msgs []provider.Message
 		for _, msg := range m.messages {
+			// Include only relevant roles
 			if msg.Role == "user" || msg.Role == "assistant" {
 				msgs = append(msgs, provider.Message{
 					Role:    msg.Role,
@@ -321,11 +320,12 @@ func (m *SessionModel) startStreaming(input string) tea.Cmd {
 			}
 		}
 
-		// Create a writer that sends chunks to the program
-		writer := &streamWriter{prog: m.prog}
+		var buf strings.Builder
+		// Use the provider's streaming method but buffer to our builder.
+		// Since we wait for it to return, it acts as a blocking call.
+		err := m.provider.QueryStreamWithHistory(msgs, &buf)
 
-		err := m.provider.QueryStreamWithHistory(msgs, writer)
-		return streamDoneMsg{err: err}
+		return queryDoneMsg{err: err, content: buf.String()}
 	}
 }
 
@@ -333,7 +333,6 @@ func (m *SessionModel) startStreaming(input string) tea.Cmd {
 func RunSessionTUI(p provider.Provider, providerName, modelName string) error {
 	model := NewSessionModel(p, providerName, modelName)
 	prog := tea.NewProgram(model, tea.WithAltScreen())
-	model.prog = prog
 	_, err := prog.Run()
 	return err
 }
