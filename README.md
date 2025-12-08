@@ -8,117 +8,89 @@
 
 ## Features
 
-- 🚀 **Simple Usage** - Just type `ask [your question]` 
+- 🚀 **Simple Usage** - Just type `ask [your question]`
 - 🎨 **Beautiful Output** - Markdown rendering with syntax highlighting
-- 🤖 **Multi-Provider** - Supports Gemini, Claude, ChatGPT, and DeepSeek
-- 🔄 **Dynamic Models** - Automatically fetches latest models from APIs
-- 📋 **Model Discovery** - `--list-models` shows all available models
-- 💬 **Interactive Sessions** - Multi-turn conversations with `-S` flag
+- 🤖 **Multi-Provider** - Gemini, Claude, ChatGPT, DeepSeek, Mistral, Qwen
+- 🔄 **Smart Detection** - Auto-detects provider from model name
+- 📋 **Profiles** - Save favorite configs with `-P fast`
+- 💬 **Interactive Sessions** - Multi-turn conversations with `-s`
+- ⚡ **Short Flags** - `-m`, `-p`, `-s`, `-P` for quick usage
 
 ## Quick Start
 
 ```bash
-# Clone the repository
+# Clone and build
 git clone https://github.com/metolius25/ask
-cd ask
+cd ask && go build -o ask
 
-# Install dependencies
-go mod download
+# First run - interactive setup
+./ask
 
-# Build
-go build -o ask
-
-# Set up config
-cp config.yaml.example config.yaml
-# Edit config.yaml and add your API key
-
-# Configure your preferred models (optional but recommended)
-./ask --configure
+# Or manually configure
+cp config.yaml.example ~/.config/ask/config.yaml
+# Edit and add your API key
 
 # Start using!
-./ask What is the meaning of life?
+ask What is the meaning of life?
 ```
 
-## Installation
+## Usage
 
-1. Clone or download this repository
-2. Install dependencies:
-   ```bash
-   go mod download
-   ```
-3. Build the binary:
-   ```bash
-   go build -o ask
-   ```
-4. (Optional) Move to your PATH:
-   ```bash
-   sudo mv ask /usr/local/bin/
-   ```
+```bash
+# Basic query
+ask What is quantum computing?
+
+# Use a specific model (auto-detects provider)
+ask -m gpt-4o Explain neural networks
+
+# Use provider/model syntax
+ask -m claude/claude-3-opus Write a poem
+
+# Use a profile
+ask -P fast Quick summary of relativity
+
+# Interactive session
+ask -s
+
+# List available models
+ask --list-models
+
+# Configure defaults
+ask --config
+```
+
+## Flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `-model` | `-m` | Model to use (e.g., `gpt-4o`, `gemini/gemini-2.5-pro`) |
+| `-provider` | `-p` | Provider (gemini, claude, chatgpt, deepseek, mistral, qwen) |
+| `-profile` | `-P` | Use a named profile from config |
+| `-session` | `-s` | Start interactive session mode |
+| `-version` | `-v` | Show version |
+| `--list-models` | | List available models |
+| `--config` | | Configure API keys (`--config` or `--config qwen`) |
 
 ## Configuration
 
-Create a `config.yaml` file in one of these locations:
-- Current directory: `./config.yaml`
-- User config directory: `~/.config/ask/config.yaml`
-
-Use the provided `config.yaml.example` as a template:
-
-```bash
-cp config.yaml.example config.yaml
-```
-
-Then edit `config.yaml` and add your API key(s):
+Config file: `~/.config/ask/config.yaml`
 
 ```yaml
 default_provider: gemini
 
 providers:
   gemini:
-    api_key: YOUR_ACTUAL_API_KEY_HERE
-    # model: gemini-2.5-pro  # Optional: override default model
+    api_key: YOUR_API_KEY
+    model: gemini-2.5-flash  # optional default
+  claude:
+    api_key: YOUR_API_KEY
+
+# Optional: quick-switch profiles
+profiles:
+  fast: gemini/gemini-2.5-flash
+  smart: claude/claude-3-opus-20240229
+  cheap: deepseek/deepseek-chat
 ```
-
-**Note:** The `model` field is optional. If not specified, the app will use the default model for each provider:
-- Gemini: `gemini-2.5-flash`
-- Claude: `claude-3-5-sonnet-20241022`
-- ChatGPT: `gpt-4o`
-- DeepSeek: `deepseek-chat`
-
-You can also override the model at runtime with the `-model` flag.
-
-## 🔧 Configuration Wizard
-
-The easiest way to set up your preferred default models is to use the interactive wizard:
-
-```bash
-ask --configure
-```
-
-This wizard will:
-1. **Fetch live models** from each provider's API (if you have API keys configured)
-2. **Display available options** with descriptions
-3. **Let you choose** your preferred default for each provider
-4. **Save automatically** to `~/.config/ask/defaults.yaml`
-
-You can run `ask --configure` anytime to update your preferences. The configuration file looks like:
-
-```yaml
-defaults:
-  gemini: gemini-2.5-flash
-  claude: claude-3-5-sonnet-20241022
-  chatgpt: gpt-4o
-  deepseek: deepseek-chat
-```
-
-**Manual Configuration**: You can also create/edit `~/.config/ask/defaults.yaml` directly using `defaults.yaml.example` as a template.
-
-### Default Model Behavior
-
-- **With configuration**: Uses your chosen defaults from `defaults.yaml`
-- **Without configuration**: Uses the first available model from each provider's API
-- **Fallback**: If API is unavailable, uses first model from minimal fallback list
-
-This means you never have outdated hardcoded models - everything is dynamic!
 
 ### Getting API Keys
 
@@ -126,158 +98,30 @@ This means you never have outdated hardcoded models - everything is dynamic!
 - **Claude**: [Anthropic Console](https://console.anthropic.com/)
 - **ChatGPT**: [OpenAI API Keys](https://platform.openai.com/api-keys)
 - **DeepSeek**: [DeepSeek Platform](https://platform.deepseek.com/)
+- **Mistral**: [Mistral Console](https://console.mistral.ai/)
+- **Qwen**: [Alibaba DashScope](https://dashscope.console.aliyun.com/)
 
-## Usage
+## Session Mode
 
-### Basic Usage
-
-Simply type `ask` followed by your prompt (no quotes needed):
-
-```bash
-ask What is the capital of France?
-ask Explain quantum computing in simple terms
-ask Write a haiku about programming
-```
-
-The response will be displayed in your terminal.
-
-### Using Different Providers
-
-Override the default provider with the `-provider` flag:
+Start an interactive session:
 
 ```bash
-ask -provider claude Explain machine learning
-ask -provider chatgpt Write a Python function
+ask -s
 ```
 
-### Using Specific Models
-
-Override the model with the `-model` flag:
-
-```bash
-ask -model gemini-1.5-pro Explain Einstein's theory of relativity
-ask -model gpt-4o-mini Quick summary of Battle of Tannenberg
-```
-
-Combine both flags:
-
-```bash
-ask -provider claude -model claude-3-opus-20240229 Write a hello world program in Go
-```
-
-### Interactive Session Mode
-
-Start an interactive chat session for multi-turn conversations:
-
-```bash
-ask -S
-```
-
-This launches a beautiful TUI where you can have extended conversations with the AI. The conversation history is maintained in memory during the session, allowing the AI to remember context across multiple exchanges.
-
-**Session Commands:**
-- `/exit` or `/quit` - Exit the session
-- `/clear` - Clear conversation history
-- `/help` - Show available commands
-
-**Example Session:**
-```bash
-$ ask -S
-
-╭───────────────────────────────────────────────╮
-│  🤖 Interactive Session Mode                 │
-│  Provider: gemini                             │
-│  Model: gemini-2.5-flash                      │
-╰───────────────────────────────────────────────╯
-
-Commands:
-  /exit or /quit  - Exit session
-  /clear          - Clear conversation history
-  /help           - Show this help message
-
-You > What is the capital of France?
-
-Assistant >
-The capital of France is **Paris**.
-
-You > What is its population?
-
-Assistant >
-Paris has a population of approximately **2.2 million** people within the city limits...
-
-You > /exit
-
-👋 Goodbye!
-```
-
-You can also specify provider and model for the session:
-
-```bash
-ask -S -provider claude -model claude-3-5-sonnet-20241022
-```
-
-**Privacy Note:** All conversation history is ephemeral and stored only in memory. It is completely destroyed when you exit the session - nothing is saved to disk.
-
-### List Available Models
-
-See all available models for each provider:
-
-```bash
-ask --list-models
-```
-
-This fetches the latest models directly from each provider's API (for configured providers) and shows:
-- All supported models per provider
-- Which model is the default for each
-- Model descriptions (if available)
-
-No configuration needed to see default models!
-
-### Help
-
-Get usage information:
-
-```bash
-ask -h
-# or
-ask --help
-```
+Session commands:
+- `/model <name>` - Switch model (e.g., `/model gpt-4o`)
+- `/clear` - Clear conversation
+- `/help` - Show commands
+- `/exit` - Exit session
 
 ## Troubleshooting
 
-### "Error 404" or "model not found"
+**"Provider not configured"** - Add API key to config.yaml
 
-The model you're trying to use may have been retired. Run `ask --list-models` to see currently available models, or remove the `model:` line from your config to use the default.
+**"Model not found"** - Run `ask --list-models` to see available models
 
-### "API key not configured" or placeholder key detected
-
-Make sure you've:
-1. Copied `config.yaml.example` to `config.yaml`
-2. Replaced `YOUR_X_API_KEY_HERE` with your actual API key
-3. Set the correct `default_provider`
-
-### Empty or blocked responses
-
-Gemini's safety filters may be blocking content. The app uses `HarmBlockOnlyHigh` settings by default. If issues persist, try:
-- Rephrasing your prompt
-- Using a different provider with `-provider claude` or `-provider chatgpt`
-
-### "config file not found"
-
-The app looks for `config.yaml` in:
-1. Current directory (`./config.yaml`)
-2. User config directory (`~/.config/ask/config.yaml`)
-
-Create the file in one of these locations.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Future Features
-
-- Custom system prompts
-- Token usage tracking
+**First time?** - Just run `ask` and follow the interactive setup
 
 ## License
 

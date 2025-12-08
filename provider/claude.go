@@ -76,7 +76,7 @@ func (c *ClaudeProvider) QueryStream(prompt string, writer io.Writer) error {
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
-	client := &http.Client{}
+	client := secureHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
@@ -150,7 +150,7 @@ func (c *ClaudeProvider) QueryStreamWithHistory(messages []Message, writer io.Wr
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
-	client := &http.Client{}
+	client := secureHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
@@ -205,7 +205,7 @@ func (c *ClaudeProvider) ListModels() ([]ModelInfo, error) {
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
-	client := &http.Client{}
+	client := secureHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return getFallbackClaudeModels(), nil

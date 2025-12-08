@@ -10,37 +10,38 @@ import (
 	"strings"
 )
 
-type DeepSeekProvider struct {
+const qwenAPIURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+
+type QwenProvider struct {
 	apiKey string
 	model  string
 }
 
-func NewDeepSeekProvider(apiKey, model string) *DeepSeekProvider {
-	// If no model specified, use first available from fallback list
+func NewQwenProvider(apiKey, model string) *QwenProvider {
 	if model == "" {
-		fallbackModels := getFallbackDeepSeekModels()
+		fallbackModels := getFallbackQwenModels()
 		if len(fallbackModels) > 0 {
 			model = fallbackModels[0].ID
 		}
 	}
-	return &DeepSeekProvider{
+	return &QwenProvider{
 		apiKey: apiKey,
 		model:  model,
 	}
 }
 
-type deepseekRequest struct {
-	Model    string            `json:"model"`
-	Messages []deepseekMessage `json:"messages"`
-	Stream   bool              `json:"stream"`
+type qwenRequest struct {
+	Model    string        `json:"model"`
+	Messages []qwenMessage `json:"messages"`
+	Stream   bool          `json:"stream"`
 }
 
-type deepseekMessage struct {
+type qwenMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-type deepseekStreamResponse struct {
+type qwenStreamResponse struct {
 	Choices []struct {
 		Delta struct {
 			Content string `json:"content"`
@@ -48,10 +49,10 @@ type deepseekStreamResponse struct {
 	} `json:"choices"`
 }
 
-func (d *DeepSeekProvider) QueryStream(prompt string, writer io.Writer) error {
-	reqBody := deepseekRequest{
-		Model: d.model,
-		Messages: []deepseekMessage{
+func (q *QwenProvider) QueryStream(prompt string, writer io.Writer) error {
+	reqBody := qwenRequest{
+		Model: q.model,
+		Messages: []qwenMessage{
 			{
 				Role:    "user",
 				Content: prompt,
@@ -65,13 +66,13 @@ func (d *DeepSeekProvider) QueryStream(prompt string, writer io.Writer) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "https://api.deepseek.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", qwenAPIURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+d.apiKey)
+	req.Header.Set("Authorization", "Bearer "+q.apiKey)
 
 	client := secureHTTPClient()
 	resp, err := client.Do(req)
@@ -82,7 +83,7 @@ func (d *DeepSeekProvider) QueryStream(prompt string, writer io.Writer) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return HandleAPIError(resp.StatusCode, body, "DeepSeek")
+		return HandleAPIError(resp.StatusCode, body, "Qwen")
 	}
 
 	// Parse SSE stream
@@ -95,7 +96,7 @@ func (d *DeepSeekProvider) QueryStream(prompt string, writer io.Writer) error {
 				break
 			}
 
-			var streamResp deepseekStreamResponse
+			var streamResp qwenStreamResponse
 			if err := json.Unmarshal([]byte(data), &streamResp); err == nil {
 				if len(streamResp.Choices) > 0 {
 					content := streamResp.Choices[0].Delta.Content
@@ -114,16 +115,15 @@ func (d *DeepSeekProvider) QueryStream(prompt string, writer io.Writer) error {
 	return nil
 }
 
-func (d *DeepSeekProvider) QueryStreamWithHistory(messages []Message, writer io.Writer) error {
-	// Convert our Message type to DeepSeek's message format
-	var deepseekMessages []deepseekMessage
+func (q *QwenProvider) QueryStreamWithHistory(messages []Message, writer io.Writer) error {
+	var qwenMessages []qwenMessage
 	for _, msg := range messages {
-		deepseekMessages = append(deepseekMessages, deepseekMessage(msg))
+		qwenMessages = append(qwenMessages, qwenMessage(msg))
 	}
 
-	reqBody := deepseekRequest{
-		Model:    d.model,
-		Messages: deepseekMessages,
+	reqBody := qwenRequest{
+		Model:    q.model,
+		Messages: qwenMessages,
 		Stream:   true,
 	}
 
@@ -132,13 +132,13 @@ func (d *DeepSeekProvider) QueryStreamWithHistory(messages []Message, writer io.
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "https://api.deepseek.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", qwenAPIURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+d.apiKey)
+	req.Header.Set("Authorization", "Bearer "+q.apiKey)
 
 	client := secureHTTPClient()
 	resp, err := client.Do(req)
@@ -149,7 +149,7 @@ func (d *DeepSeekProvider) QueryStreamWithHistory(messages []Message, writer io.
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return HandleAPIError(resp.StatusCode, body, "DeepSeek")
+		return HandleAPIError(resp.StatusCode, body, "Qwen")
 	}
 
 	// Parse SSE stream
@@ -162,7 +162,7 @@ func (d *DeepSeekProvider) QueryStreamWithHistory(messages []Message, writer io.
 				break
 			}
 
-			var streamResp deepseekStreamResponse
+			var streamResp qwenStreamResponse
 			if err := json.Unmarshal([]byte(data), &streamResp); err == nil {
 				if len(streamResp.Choices) > 0 {
 					content := streamResp.Choices[0].Delta.Content
@@ -181,55 +181,17 @@ func (d *DeepSeekProvider) QueryStreamWithHistory(messages []Message, writer io.
 	return nil
 }
 
-func (d *DeepSeekProvider) ListModels() ([]ModelInfo, error) {
-	req, err := http.NewRequest("GET", "https://api.deepseek.com/v1/models", nil)
-	if err != nil {
-		return getFallbackDeepSeekModels(), nil
-	}
-
-	req.Header.Set("Authorization", "Bearer "+d.apiKey)
-
-	client := secureHTTPClient()
-	resp, err := client.Do(req)
-	if err != nil {
-		return getFallbackDeepSeekModels(), nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return getFallbackDeepSeekModels(), nil
-	}
-
-	var result struct {
-		Data []struct {
-			ID      string `json:"id"`
-			OwnedBy string `json:"owned_by"`
-		} `json:"data"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return getFallbackDeepSeekModels(), nil
-	}
-
-	if len(result.Data) == 0 {
-		return getFallbackDeepSeekModels(), nil
-	}
-
-	var models []ModelInfo
-	for _, m := range result.Data {
-		models = append(models, ModelInfo{
-			ID:          m.ID,
-			Name:        m.ID,
-			Description: "",
-		})
-	}
-
-	return models, nil
+func (q *QwenProvider) ListModels() ([]ModelInfo, error) {
+	// Qwen doesn't have a public models list API, return fallback
+	return getFallbackQwenModels(), nil
 }
 
-func getFallbackDeepSeekModels() []ModelInfo {
+func getFallbackQwenModels() []ModelInfo {
 	return []ModelInfo{
-		{ID: "deepseek-chat", Name: "DeepSeek Chat", Description: "General purpose chat model"},
-		{ID: "deepseek-reasoner", Name: "DeepSeek Reasoner", Description: "Advanced reasoning model"},
+		{ID: "qwen-max", Name: "Qwen Max", Description: "Most capable Qwen model"},
+		{ID: "qwen-plus", Name: "Qwen Plus", Description: "Balanced performance"},
+		{ID: "qwen-turbo", Name: "Qwen Turbo", Description: "Fast and efficient"},
+		{ID: "qwen2.5-72b-instruct", Name: "Qwen 2.5 72B", Description: "Large instruction model"},
+		{ID: "qwen2.5-32b-instruct", Name: "Qwen 2.5 32B", Description: "Medium instruction model"},
 	}
 }

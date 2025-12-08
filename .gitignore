@@ -1,20 +1,14 @@
-# Binary
+# Binaries
 ask
+ask.exe
+ask-test
 
-# Config files with API keys
+# Configuration
 config.yaml
+.config/
 defaults.yaml
+configss.yaml
 
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-ask
-
-# Test binary, built with `go test -c`
-*.test
-
-# Go coverage files
-*.out
+# OS specific
+.DS_Store
+Thumbs.db

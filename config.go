@@ -13,7 +13,9 @@ import (
 
 type Config struct {
 	DefaultProvider string                    `yaml:"default_provider"`
+	Default         string                    `yaml:"default,omitempty"` // Alias for default_provider
 	Providers       map[string]ProviderConfig `yaml:"providers"`
+	Profiles        map[string]string         `yaml:"profiles,omitempty"`
 }
 
 type ProviderConfig struct {
@@ -45,9 +47,24 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	// Validate config
+	// Support 'default' as alias for 'default_provider'
+	if config.DefaultProvider == "" && config.Default != "" {
+		config.DefaultProvider = config.Default
+	}
+
+	// If still no default, try to auto-detect from configured providers
 	if config.DefaultProvider == "" {
-		return nil, fmt.Errorf("default_provider not set in config")
+		for name, pc := range config.Providers {
+			if pc.APIKey != "" && !isPlaceholderKey(pc.APIKey) {
+				config.DefaultProvider = name
+				break
+			}
+		}
+	}
+
+	// Validate config - require at least one configured provider
+	if config.DefaultProvider == "" {
+		return nil, fmt.Errorf("no valid provider configured")
 	}
 
 	providerConfig, exists := config.Providers[config.DefaultProvider]

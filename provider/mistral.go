@@ -73,7 +73,7 @@ func (m *MistralProvider) QueryStream(prompt string, writer io.Writer) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
-	client := &http.Client{}
+	client := secureHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
@@ -140,7 +140,7 @@ func (m *MistralProvider) QueryStreamWithHistory(messages []Message, writer io.W
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
-	client := &http.Client{}
+	client := secureHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
@@ -189,7 +189,7 @@ func (m *MistralProvider) ListModels() ([]ModelInfo, error) {
 
 	req.Header.Set("Authorization", "Bearer "+m.apiKey)
 
-	client := &http.Client{}
+	client := secureHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return getFallbackMistralModels(), nil

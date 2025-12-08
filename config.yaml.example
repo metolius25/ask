@@ -1,17 +1,35 @@
-# Default provider to use (gemini, claude, chatgpt, or deepseek)
+# Ask Configuration
+# Place this file at ~/.config/ask/config.yaml or ./config.yaml
+
+# Default provider to use (or use 'default:' as shorthand)
 default_provider: gemini
 
 # Provider configurations
-# Only configure the providers you want to use
 providers:
   gemini:
     api_key: YOUR_GEMINI_API_KEY_HERE
+    model: gemini-2.5-flash  # optional: default model for this provider
   
   claude:
     api_key: YOUR_CLAUDE_API_KEY_HERE
+    model: claude-3-5-sonnet-20241022
   
   chatgpt:
     api_key: YOUR_OPENAI_API_KEY_HERE
+    model: gpt-4o
   
   deepseek:
     api_key: YOUR_DEEPSEEK_API_KEY_HERE
+    model: deepseek-chat
+  
+  mistral:
+    api_key: YOUR_MISTRAL_API_KEY_HERE
+    model: mistral-large-latest
+
+# Profiles for quick switching (optional)
+# Use with: ask -P fast "your prompt"
+profiles:
+  fast: gemini/gemini-2.5-flash
+  smart: claude/claude-3-opus-20240229
+  cheap: deepseek/deepseek-chat
+  code: deepseek/deepseek-coder
